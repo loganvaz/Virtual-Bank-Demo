@@ -29,6 +29,12 @@ class DateError(Exception):
     pass
 
 
+def validate_positive_amount(amount):
+    if amount is None or amount <= 0:
+        raise exceptions.ValidationError({"amount": "Amount must be greater than zero."})
+    return amount
+
+
 class TransactionListAdmin(generics.ListCreateAPIView):
     queryset = Transaction.objects.all()
     serializer_class = TransactionSerializer
@@ -49,7 +55,7 @@ class CreateDepositTransaction(generics.CreateAPIView):
 
     def perform_create(self, serializer):
         account_number = serializer.validated_data.pop("account_number")
-        transaction_amount = serializer.validated_data.pop("amount")
+        transaction_amount = validate_positive_amount(serializer.validated_data.pop("amount"))
         account = Account.objects.filter(number=account_number).first()
 
         if not account:
@@ -79,7 +85,7 @@ class CreateTransferTransaction(generics.CreateAPIView):
     def perform_create(self, serializer):
         payer_account_number = serializer.validated_data.pop("payer_account_number")
         payee_account_number = serializer.validated_data.pop("payee_account_number")
-        transaction_amount = serializer.validated_data.pop("amount")
+        transaction_amount = validate_positive_amount(serializer.validated_data.pop("amount"))
 
         account = Account.objects.filter(number=payer_account_number).first()
         user = self.request.user
@@ -186,8 +192,7 @@ class CreateDebitCardTransaction(generics.CreateAPIView):
         cvv = serializer.validated_data.pop("cvv")
         expiration_date = serializer.validated_data.pop("expiration_date")
 
-        transaction_amount = serializer.validated_data.pop("amount")
-
+        transaction_amount = validate_positive_amount(serializer.validated_data.pop("amount"))
 
         account = Account.objects.filter(number=account_number).first()
         user = self.request.user
