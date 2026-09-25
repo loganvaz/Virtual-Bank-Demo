@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework import generics
 from datetime import datetime
 from notifications.utils import process_notifications
@@ -24,6 +26,36 @@ from .utils import convert_currency
 from accounts.utils import currency_to_unicode
 
 from .paginations import TransactionPagination
+
+logger = logging.getLogger(__name__)
+
+
+def log_rejected(event, user, reason, **fields):
+    """Audit a rejected operation. Only surrogate IDs / amounts are logged."""
+    logger.warning(
+        "%s.rejected actor_id=%s reason=%r %s",
+        event,
+        getattr(user, "pk", None),
+        reason,
+        " ".join(f"{k}={v}" for k, v in fields.items()),
+    )
+
+
+def log_created(event, user, transaction, **fields):
+    logger.info(
+        "%s.created actor_id=%s transaction_id=%s payer_id=%s payee_id=%s amount_sent=%s currency_sent=%s amount_received=%s currency_received=%s %s",
+        event,
+        getattr(user, "pk", None),
+        transaction.identifier,
+        transaction.payer_id,
+        transaction.payee_id,
+        transaction.amount_sent,
+        transaction.currency_sent,
+        transaction.amount_received,
+        transaction.currency_received,
+        " ".join(f"{k}={v}" for k, v in fields.items()),
+    )
+
 
 class DateError(Exception):
     pass
@@ -53,16 +85,19 @@ class CreateDepositTransaction(generics.CreateAPIView):
         account = Account.objects.filter(number=account_number).first()
 
         if not account:
+            log_rejected("deposit", self.request.user, "account_not_found")
             raise exceptions.NotFound("Account not found")
 
         if account.user != self.request.user:
+            log_rejected("deposit", self.request.user, "not_owner", account_id=account.pk)
             raise exceptions.PermissionDenied("Account does not belong to this user")
 
-        serializer.save(account=account, payer=account, payee=account, amount_sent=transaction_amount, amount_received=transaction_amount, transaction_type="DEPOSIT", currency_sent=account.currency, currency_received=account.currency, rate=1)
+        transaction = serializer.save(account=account, payer=account, payee=account, amount_sent=transaction_amount, amount_received=transaction_amount, transaction_type="DEPOSIT", currency_sent=account.currency, currency_received=account.currency, rate=1)
 
         # Update Account Balance
         account.balance += transaction_amount
         account.save()
+        log_created("deposit", self.request.user, transaction)
 
         # notification
         notification_message = f"A deposit of {transaction_amount} has been credited to your account ({account_number})."
@@ -91,15 +126,17 @@ class CreateTransferTransaction(generics.CreateAPIView):
             process_notifications(
                 self.request.user, "transaction_notification", notification_message
             )
-
+            log_rejected("transfer", user, "same_account")
             raise exceptions.PermissionDenied(
                 "Payer and Payee accounts cannot be identical."
             )
 
         if not account:
+            log_rejected("transfer", user, "payer_account_not_found")
             raise exceptions.NotFound("Account not found")
 
         if account.user != user:
+            log_rejected("transfer", user, "not_owner", account_id=account.pk)
             # notification
             notification_message = f"{user_name} attempted a transfer using your account ({account.number}). For security purposes, the action has been flagged."
             process_notifications(
@@ -117,6 +154,7 @@ class CreateTransferTransaction(generics.CreateAPIView):
             process_notifications(
                 self.request.user, "transaction_notification", notification_message
             )
+            log_rejected("transfer", user, "payee_account_not_found", account_id=account.pk)
             raise exceptions.NotFound("Payee Account not found")
 
         if account.balance >= transaction_amount:
@@ -134,7 +172,7 @@ class CreateTransferTransaction(generics.CreateAPIView):
             account.save()
             payee_account.save()
 
-            serializer.save(
+            transaction = serializer.save(
                 account=account,
                 payer=account,
                 payee=payee_account,
@@ -145,6 +183,7 @@ class CreateTransferTransaction(generics.CreateAPIView):
                 rate=rate,
                 transaction_type="TRANSFER"
             )
+            log_created("transfer", user, transaction, rate=rate)
 
             if self.request.user == payee_account.user:
                 notification_message = f"The transfer of {currency_to_unicode(account.currency)}{transaction_amount} to {account.name} was successful."
@@ -172,6 +211,7 @@ class CreateTransferTransaction(generics.CreateAPIView):
             process_notifications(
                 self.request.user, "transaction_notification", notification_message
             )
+            log_rejected("transfer", user, "insufficient_funds", account_id=account.pk, amount=transaction_amount)
             raise exceptions.PermissionDenied("Insufficient funds")
 
 
@@ -194,9 +234,11 @@ class CreateDebitCardTransaction(generics.CreateAPIView):
         user_name = f"{user.first_name} {user.last_name}"
 
         if not account:
+            log_rejected("debit_card", user, "payee_account_not_found")
             raise exceptions.NotFound("Account not found")
 
         if account.user != self.request.user:
+            log_rejected("debit_card", user, "not_owner", account_id=account.pk)
             raise exceptions.PermissionDenied("Account does not belong to this user")
 
         # Validation of expiry date
@@ -217,12 +259,15 @@ class CreateDebitCardTransaction(generics.CreateAPIView):
             elif not (year <= 99):
                 raise DateError("Invalid year")
         except DateError as e:
+            log_rejected("debit_card", user, str(e), account_id=account.pk)
             raise exceptions.PermissionDenied(str(e))
         except ValueError:
+            log_rejected("debit_card", user, "invalid_expiry_format", account_id=account.pk)
             raise exceptions.PermissionDenied("Invalid expiry date")
 
         # validate card number using luhn algorithm
         if luhn_checksum(card_number) != 0:
+            log_rejected("debit_card", user, "luhn_failed", account_id=account.pk)
             raise exceptions.PermissionDenied("Invalid card number")
 
         card = DebitCard.objects.filter(
@@ -233,6 +278,7 @@ class CreateDebitCardTransaction(generics.CreateAPIView):
         ).first()
 
         if not card:
+            log_rejected("debit_card", user, "card_not_found", account_id=account.pk)
             raise exceptions.PermissionDenied("Invalid card")
 
         if int(account_number) == int(card.account.number):
@@ -242,6 +288,7 @@ class CreateDebitCardTransaction(generics.CreateAPIView):
                 self.request.user, "transaction_notification", notification_message
             )
 
+            log_rejected("debit_card", user, "same_account", account_id=account.pk)
             raise exceptions.PermissionDenied(
                 "Payee and Payer accounts cannot be the same"
             )
@@ -262,7 +309,7 @@ class CreateDebitCardTransaction(generics.CreateAPIView):
             card.account.save()
             account.save()
 
-            serializer.save(
+            transaction = serializer.save(
                 account=account,
                 payer=payer_account,
                 payee=account,
@@ -273,6 +320,7 @@ class CreateDebitCardTransaction(generics.CreateAPIView):
                 rate=rate,
                 transaction_type="DEBIT_CARD"
             )
+            log_created("debit_card", user, transaction, card_id=card.pk, rate=rate)
 
             if self.request.user == card.account.user:
                 notification_message = f"You've successfully initiated a debit card transaction. {currency_to_unicode(card.account.currency)}{transaction_amount} was debited from your account and sent to {card.account.name} account."
@@ -303,6 +351,7 @@ class CreateDebitCardTransaction(generics.CreateAPIView):
             process_notifications(
                 card.account.user, "transaction_notification", notification_message
             )
+            log_rejected("debit_card", user, "insufficient_funds", account_id=payer_account.pk, amount=transaction_amount)
             raise exceptions.PermissionDenied("Insufficient funds")
 
 

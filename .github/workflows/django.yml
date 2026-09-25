@@ -1,0 +1,54 @@
+name: Django CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  api-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.12"]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: pip
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run API test-suite with coverage
+      working-directory: api
+      run: |
+        python -m pytest \
+          --cov --cov-report=term-missing --cov-report=xml --cov-report=html \
+          --cov-fail-under=90 \
+          --junitxml=reports/junit.xml \
+          --html=reports/pytest_report.html --self-contained-html
+
+    - name: Coverage by control domain
+      run: python scripts/coverage_by_domain.py api/reports/coverage.xml --md | tee -a "$GITHUB_STEP_SUMMARY"
+
+    - name: Scan test-run logs for PII
+      run: python scripts/scan_logs_for_pii.py "api/logs/*.log"
+
+    - name: Upload reports
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: api-test-reports-py${{ matrix.python-version }}
+        path: |
+          api/reports/pytest_report.html
+          api/reports/coverage_html
+          api/reports/coverage.xml
+          api/reports/junit.xml
