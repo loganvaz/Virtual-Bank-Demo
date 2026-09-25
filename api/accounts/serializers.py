@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from rest_framework import serializers
 from .models import Account
 from .utils import generate_account_number
@@ -37,6 +39,7 @@ class AccountCreateSerializer(serializers.ModelSerializer):
     number = serializers.CharField(read_only=True)
     created_date = serializers.DateTimeField(read_only=True)
     user = UserSerializer(read_only=True)
+    balance = serializers.DecimalField(max_digits=15, decimal_places=2, min_value=Decimal("0"), required=False, default=Decimal("0"))
 
     class Meta:
         model = Account
