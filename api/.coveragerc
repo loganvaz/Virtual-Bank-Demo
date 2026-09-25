@@ -1,11 +1,10 @@
 [run]
 branch = True
-# Scoped to the demo's control-domain modules (transactions + logging layer).
+# Scoped to the demo's control-domain modules (transactions, debit_cards + logging layer).
 source = .
 omit =
     accounts/*
     api/*
-    debit_cards/*
     notifications/*
     users/*
     websocket/*
