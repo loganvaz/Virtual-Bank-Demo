@@ -24,6 +24,9 @@ from .utils import convert_currency
 from accounts.utils import currency_to_unicode
 
 from .paginations import TransactionPagination
+from virtual_bank.log_redaction import get_redacted_logger, mask_number
+
+logger = get_redacted_logger(__name__)
 
 class DateError(Exception):
     pass
@@ -53,9 +56,17 @@ class CreateDepositTransaction(generics.CreateAPIView):
         account = Account.objects.filter(number=account_number).first()
 
         if not account:
+            logger.warning(
+                "Deposit rejected: account not found user_id=%s account=%s",
+                self.request.user.id, mask_number(account_number),
+            )
             raise exceptions.NotFound("Account not found")
 
         if account.user != self.request.user:
+            logger.warning(
+                "Deposit rejected: account ownership mismatch user_id=%s account=%s",
+                self.request.user.id, mask_number(account_number),
+            )
             raise exceptions.PermissionDenied("Account does not belong to this user")
 
         serializer.save(account=account, payer=account, payee=account, amount_sent=transaction_amount, amount_received=transaction_amount, transaction_type="DEPOSIT", currency_sent=account.currency, currency_received=account.currency, rate=1)
@@ -63,6 +74,11 @@ class CreateDepositTransaction(generics.CreateAPIView):
         # Update Account Balance
         account.balance += transaction_amount
         account.save()
+        logger.info(
+            "Deposit created identifier=%s user_id=%s account=%s amount=%s currency=%s",
+            serializer.instance.identifier, self.request.user.id,
+            mask_number(account.number), transaction_amount, account.currency,
+        )
 
         # notification
         notification_message = f"A deposit of {transaction_amount} has been credited to your account ({account_number})."
@@ -86,6 +102,10 @@ class CreateTransferTransaction(generics.CreateAPIView):
         user_name = f"{user.first_name} {user.last_name}"
 
         if int(payer_account_number) == int(payee_account_number):
+            logger.warning(
+                "Transfer rejected: identical payer and payee user_id=%s account=%s",
+                user.id, mask_number(payer_account_number),
+            )
             # notification
             notification_message = "The transfer could not be completed."
             process_notifications(
@@ -97,9 +117,17 @@ class CreateTransferTransaction(generics.CreateAPIView):
             )
 
         if not account:
+            logger.warning(
+                "Transfer rejected: payer account not found user_id=%s payer=%s",
+                user.id, mask_number(payer_account_number),
+            )
             raise exceptions.NotFound("Account not found")
 
         if account.user != user:
+            logger.warning(
+                "Transfer rejected: payer account ownership mismatch user_id=%s payer=%s",
+                user.id, mask_number(payer_account_number),
+            )
             # notification
             notification_message = f"{user_name} attempted a transfer using your account ({account.number}). For security purposes, the action has been flagged."
             process_notifications(
@@ -110,6 +138,10 @@ class CreateTransferTransaction(generics.CreateAPIView):
         payee_account = Account.objects.filter(number=payee_account_number).first()
 
         if not payee_account:
+            logger.warning(
+                "Transfer rejected: payee account not found user_id=%s payee=%s",
+                user.id, mask_number(payee_account_number),
+            )
             # notification
             notification_message = (
                 "The transfer could not be completed due to an invalid account number."
@@ -145,6 +177,13 @@ class CreateTransferTransaction(generics.CreateAPIView):
                 rate=rate,
                 transaction_type="TRANSFER"
             )
+            logger.info(
+                "Transfer created identifier=%s user_id=%s payer=%s payee=%s "
+                "amount_sent=%s currency_sent=%s amount_received=%.2f currency_received=%s",
+                serializer.instance.identifier, user.id, mask_number(account.number),
+                mask_number(payee_account.number), transaction_amount, account.currency,
+                received_amount, payee_account.currency,
+            )
 
             if self.request.user == payee_account.user:
                 notification_message = f"The transfer of {currency_to_unicode(account.currency)}{transaction_amount} to {account.name} was successful."
@@ -166,6 +205,10 @@ class CreateTransferTransaction(generics.CreateAPIView):
 
         else:
             # notification
+            logger.warning(
+                "Transfer rejected: insufficient funds user_id=%s payer=%s amount=%s currency=%s",
+                user.id, mask_number(account.number), transaction_amount, account.currency,
+            )
             notification_message = (
                 "The transfer could not be completed due to insufficient funds."
             )
@@ -194,9 +237,17 @@ class CreateDebitCardTransaction(generics.CreateAPIView):
         user_name = f"{user.first_name} {user.last_name}"
 
         if not account:
+            logger.warning(
+                "Debit card payment rejected: payee account not found user_id=%s payee=%s",
+                user.id, mask_number(account_number),
+            )
             raise exceptions.NotFound("Account not found")
 
         if account.user != self.request.user:
+            logger.warning(
+                "Debit card payment rejected: payee account ownership mismatch user_id=%s payee=%s",
+                user.id, mask_number(account_number),
+            )
             raise exceptions.PermissionDenied("Account does not belong to this user")
 
         # Validation of expiry date
@@ -217,12 +268,24 @@ class CreateDebitCardTransaction(generics.CreateAPIView):
             elif not (year <= 99):
                 raise DateError("Invalid year")
         except DateError as e:
+            logger.warning(
+                "Debit card payment rejected: %s user_id=%s card=%s",
+                e, user.id, mask_number(card_number),
+            )
             raise exceptions.PermissionDenied(str(e))
         except ValueError:
+            logger.warning(
+                "Debit card payment rejected: Invalid expiry date user_id=%s card=%s",
+                user.id, mask_number(card_number),
+            )
             raise exceptions.PermissionDenied("Invalid expiry date")
 
         # validate card number using luhn algorithm
         if luhn_checksum(card_number) != 0:
+            logger.warning(
+                "Debit card payment rejected: invalid card number user_id=%s card=%s",
+                user.id, mask_number(card_number),
+            )
             raise exceptions.PermissionDenied("Invalid card number")
 
         card = DebitCard.objects.filter(
@@ -233,9 +296,17 @@ class CreateDebitCardTransaction(generics.CreateAPIView):
         ).first()
 
         if not card:
+            logger.warning(
+                "Debit card payment rejected: card not found user_id=%s card=%s",
+                user.id, mask_number(card_number),
+            )
             raise exceptions.PermissionDenied("Invalid card")
 
         if int(account_number) == int(card.account.number):
+            logger.warning(
+                "Debit card payment rejected: payee is the card's own account user_id=%s card=%s",
+                user.id, mask_number(card_number),
+            )
             # notification
             notification_message = "The debit card transaction could not be completed."
             process_notifications(
@@ -273,6 +344,13 @@ class CreateDebitCardTransaction(generics.CreateAPIView):
                 rate=rate,
                 transaction_type="DEBIT_CARD"
             )
+            logger.info(
+                "Debit card payment created identifier=%s user_id=%s card=%s payer=%s payee=%s "
+                "amount_sent=%s currency_sent=%s amount_received=%.2f currency_received=%s",
+                serializer.instance.identifier, user.id, mask_number(card_number),
+                mask_number(payer_account.number), mask_number(account.number),
+                transaction_amount, payer_account.currency, received_amount, account.currency,
+            )
 
             if self.request.user == card.account.user:
                 notification_message = f"You've successfully initiated a debit card transaction. {currency_to_unicode(card.account.currency)}{transaction_amount} was debited from your account and sent to {card.account.name} account."
@@ -293,6 +371,10 @@ class CreateDebitCardTransaction(generics.CreateAPIView):
                 )
         else:
             # notification
+            logger.warning(
+                "Debit card payment rejected: insufficient funds user_id=%s card=%s amount=%s currency=%s",
+                user.id, mask_number(card_number), transaction_amount, payer_account.currency,
+            )
             notification_message = f"The debit card transaction from {payer_account_name} could not be completed due to insufficient funds in their account."
             process_notifications(
                 self.request.user, "transaction_notification", notification_message
@@ -362,6 +444,10 @@ class TransactionDetail(generics.RetrieveAPIView):
             or transaction.payer != user
             or transaction.payee != user
         ):
+            logger.info(
+                "Transaction viewed by non-owner view=TransactionDetail identifier=%s viewer_id=%s",
+                transaction.identifier, user.id,
+            )
             transaction_date = localtime(transaction.date).strftime(
                 "%m/%d/%Y at %I:%M %p"
             )
@@ -405,6 +491,10 @@ class DepositDetail(generics.RetrieveAPIView):
 
         if self.request.user != deposit.account.user:
             user = self.request.user
+            logger.info(
+                "Transaction viewed by non-owner view=DepositDetail identifier=%s viewer_id=%s",
+                deposit.identifier, user.id,
+            )
             transaction_date = localtime(deposit.transaction.date).strftime(
                 "%m/%d/%Y at %I:%M %p"
             )
@@ -477,6 +567,10 @@ class TransferDetails(generics.RetrieveAPIView):
             and self.request.user != payee
         ):
             user = self.request.user
+            logger.info(
+                "Transaction viewed by non-owner view=TransferDetails identifier=%s viewer_id=%s",
+                transfer.identifier, user.id,
+            )
             transaction_date = localtime(transfer.transaction.date).strftime(
                 "%m/%d/%Y at %I:%M %p"
             )
@@ -552,6 +646,10 @@ class DebitCardDetails(generics.RetrieveAPIView):
             and self.request.user != payee
         ):
             user = self.request.user
+            logger.info(
+                "Transaction viewed by non-owner view=DebitCardDetails identifier=%s viewer_id=%s",
+                card.identifier, user.id,
+            )
             transaction_date = localtime(card.transaction.date).strftime(
                 "%m/%d/%Y at %I:%M %p"
             )

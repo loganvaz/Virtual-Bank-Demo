@@ -257,3 +257,27 @@ SIMPLE_JWT = {
 
 
 LOGIN_URL = 'api:user_login'
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "filters": {
+        "redact_pii": {"()": "virtual_bank.log_redaction.RedactingFilter"},
+    },
+    "formatters": {
+        "standard": {"format": "%(asctime)s %(levelname)s %(name)s %(message)s"},
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "filters": ["redact_pii"],
+            "formatter": "standard",
+        },
+    },
+    "loggers": {
+        "transactions": {
+            "handlers": ["console"],
+            "level": os.getenv("LOG_LEVEL", "INFO"),
+            "propagate": False,
+        },
+    },
+}
