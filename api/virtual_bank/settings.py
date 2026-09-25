@@ -75,6 +75,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "virtual_bank.logging.RequestIDMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
@@ -257,3 +258,45 @@ SIMPLE_JWT = {
 
 
 LOGIN_URL = 'api:user_login'
+
+
+# Logging
+# Every handler carries the PII redaction filter; application code logs
+# surrogate IDs / amounts only (see virtual_bank/logging/pii.py).
+LOG_DIR = os.getenv("LOG_DIR", os.path.join(BASE_DIR, "logs"))
+os.makedirs(LOG_DIR, exist_ok=True)
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "filters": {
+        "request_id": {"()": "virtual_bank.logging.RequestIDFilter"},
+        "pii_redact": {"()": "virtual_bank.logging.PIIRedactingFilter"},
+    },
+    "formatters": {
+        "structured": {
+            "format": "%(asctime)s %(levelname)s %(name)s request_id=%(request_id)s %(message)s",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "filters": ["request_id", "pii_redact"],
+            "formatter": "structured",
+        },
+        "file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": os.path.join(LOG_DIR, "api.log"),
+            "maxBytes": 10 * 1024 * 1024,
+            "backupCount": 5,
+            "filters": ["request_id", "pii_redact"],
+            "formatter": "structured",
+        },
+    },
+    "root": {"handlers": ["console", "file"], "level": LOG_LEVEL},
+    "loggers": {
+        "django": {"level": "WARNING", "propagate": True},
+        "transactions": {"level": "INFO", "propagate": True},
+    },
+}

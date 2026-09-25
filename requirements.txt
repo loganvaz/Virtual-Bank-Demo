@@ -53,3 +53,10 @@ uritemplate==4.1.1
 urllib3==2.2.3
 whitenoise==6.6.0
 zope.interface==7.0.1
+
+# Test / coverage tooling
+pytest==8.3.4
+pytest-django==4.9.0
+pytest-cov==6.0.0
+pytest-html==4.1.1
+factory_boy==3.3.1

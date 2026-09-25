@@ -169,3 +169,8 @@ staticfiles/
 profile_pics/
 # bootstrap-5.3.3-dist/
 migrations/
+logs/
+api/reports/coverage.xml
+api/reports/coverage_html/
+api/reports/junit.xml
+api/reports/pytest_report.html

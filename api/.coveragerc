@@ -1,0 +1,28 @@
+[run]
+branch = True
+# Scoped to the demo's control-domain modules (transactions + logging layer).
+source = .
+omit =
+    accounts/*
+    api/*
+    debit_cards/*
+    notifications/*
+    users/*
+    websocket/*
+    virtual_bank/*.py
+    conftest.py
+    manage.py
+    */migrations/*
+    */tests/*
+    */admin.py
+    */apps.py
+
+[report]
+show_missing = True
+precision = 1
+
+[html]
+directory = reports/coverage_html
+
+[xml]
+output = reports/coverage.xml
