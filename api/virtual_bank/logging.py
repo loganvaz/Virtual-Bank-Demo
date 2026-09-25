@@ -130,6 +130,7 @@ def build_logging_config(level="INFO"):
         "root": {"handlers": ["console"], "level": "WARNING"},
         "loggers": {
             "transactions": {"handlers": ["console"], "level": level, "propagate": False},
+            "accounts": {"handlers": ["console"], "level": level, "propagate": False},
             "security": {"handlers": ["console"], "level": "WARNING", "propagate": False},
             "django.request": {"handlers": ["console"], "level": "WARNING", "propagate": False},
         },
