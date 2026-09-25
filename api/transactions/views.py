@@ -50,6 +50,10 @@ class CreateDepositTransaction(generics.CreateAPIView):
     def perform_create(self, serializer):
         account_number = serializer.validated_data.pop("account_number")
         transaction_amount = serializer.validated_data.pop("amount")
+
+        if transaction_amount <= 0:
+            raise exceptions.ValidationError({"amount": "Amount must be greater than zero."})
+
         account = Account.objects.filter(number=account_number).first()
 
         if not account:
@@ -80,6 +84,9 @@ class CreateTransferTransaction(generics.CreateAPIView):
         payer_account_number = serializer.validated_data.pop("payer_account_number")
         payee_account_number = serializer.validated_data.pop("payee_account_number")
         transaction_amount = serializer.validated_data.pop("amount")
+
+        if transaction_amount <= 0:
+            raise exceptions.ValidationError({"amount": "Amount must be greater than zero."})
 
         account = Account.objects.filter(number=payer_account_number).first()
         user = self.request.user
@@ -188,6 +195,8 @@ class CreateDebitCardTransaction(generics.CreateAPIView):
 
         transaction_amount = serializer.validated_data.pop("amount")
 
+        if transaction_amount <= 0:
+            raise exceptions.ValidationError({"amount": "Amount must be greater than zero."})
 
         account = Account.objects.filter(number=account_number).first()
         user = self.request.user
