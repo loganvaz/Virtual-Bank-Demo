@@ -1,13 +1,27 @@
-from django.shortcuts import render
 from .serializers import DebitCardSerializer
 from .models import DebitCard
-from accounts.models import Account
 from rest_framework import generics
 from rest_framework import exceptions
-from django.db.models import Q
 from rest_framework import permissions
-from notifications.utils import process_notifications
-from django.utils.timezone import localtime
+from virtual_bank.logging import get_logger
+
+logger = get_logger("debit_cards")
+security_logger = get_logger("security")
+
+
+def _reject(request, event, reason, exc_class, detail, security=False, **fields):
+    log = security_logger if security else logger
+    log.warning(
+        "%s rejected: %s",
+        event,
+        reason,
+        extra={"event": f"{event}.rejected", "reason": reason, "user_id": request.user.pk, **fields},
+    )
+    raise exc_class(detail)
+
+
+def _card_fields(card):
+    return {"card_id": card.pk, "account_id": card.account_id, "user_id": card.account.user_id}
 
 
 class DebitCardList(generics.ListCreateAPIView):
@@ -15,11 +29,24 @@ class DebitCardList(generics.ListCreateAPIView):
     serializer_class = DebitCardSerializer
     permission_classes = [permissions.IsAdminUser]
 
+    def perform_create(self, serializer):
+        card = serializer.save()
+        logger.info("debit card created", extra={"event": "card.created", **_card_fields(card)})
+
 
 class DebitCardDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = DebitCard.objects.all()
     serializer_class = DebitCardSerializer
     permission_classes = [permissions.IsAdminUser]
+
+    def perform_update(self, serializer):
+        card = serializer.save()
+        logger.info("debit card updated", extra={"event": "card.updated", **_card_fields(card)})
+
+    def perform_destroy(self, instance):
+        fields = _card_fields(instance)
+        instance.delete()
+        logger.info("debit card deleted", extra={"event": "card.deleted", **fields})
 
 
 class UserDebitCardList(generics.ListAPIView):
@@ -43,12 +70,8 @@ class UserDebitCardDetail(generics.RetrieveAPIView):
 
         debit_card = DebitCard.objects.filter(card_number=number, account__user=user).first()
 
-
         if not debit_card:
-            raise exceptions.NotFound()
+            _reject(self.request, "card_lookup", "card_not_found", exceptions.NotFound,
+                    "Not found.", security=True)
 
         return debit_card
-
-
-# def renewDebitCard():
-#     pass
