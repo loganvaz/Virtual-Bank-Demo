@@ -224,6 +224,11 @@ CSRF_TRUSTED_ORIGINS = [
 
 LOGGING = build_logging_config(level=os.getenv("LOG_LEVEL", "INFO"))
 
+if os.getenv("TEST_REPORT_DIR"):
+    TEST_RUNNER = "xmlrunner.extra.djangotestrunner.XMLTestRunner"
+    TEST_OUTPUT_DIR = os.getenv("TEST_REPORT_DIR")
+    TEST_OUTPUT_FILE_NAME = "junit.xml"
+
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(days=2),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=15),

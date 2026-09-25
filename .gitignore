@@ -169,3 +169,7 @@ staticfiles/
 profile_pics/
 # bootstrap-5.3.3-dist/
 migrations/
+# test reports
+api/reports/
+.coverage
+api/reports_before/
