@@ -57,7 +57,6 @@ class UserNotificationDetail(generics.RetrieveAPIView):
 
         try:
             notification = queryset.get(id=notification_number)
-            print(notification)
         except Notification.DoesNotExist:
             raise NotFound("Notification not found.")
 
