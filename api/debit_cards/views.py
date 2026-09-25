@@ -1,13 +1,14 @@
-from django.shortcuts import render
-from .serializers import DebitCardSerializer
-from .models import DebitCard
-from accounts.models import Account
-from rest_framework import generics
+import logging
+
 from rest_framework import exceptions
-from django.db.models import Q
+from rest_framework import generics
 from rest_framework import permissions
-from notifications.utils import process_notifications
-from django.utils.timezone import localtime
+
+from .models import DebitCard
+from .serializers import DebitCardSerializer
+
+logger = logging.getLogger(__name__)
+security_logger = logging.getLogger("security")
 
 
 class DebitCardList(generics.ListCreateAPIView):
@@ -31,6 +32,15 @@ class UserDebitCardList(generics.ListAPIView):
         user = self.request.user
         return DebitCard.objects.filter(account__user=user)
 
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        logger.info(
+            "debit_card.listed actor_id=%s count=%s",
+            request.user.pk,
+            len(response.data),
+        )
+        return response
+
 
 class UserDebitCardDetail(generics.RetrieveAPIView):
     queryset = DebitCard.objects.all()
@@ -43,10 +53,16 @@ class UserDebitCardDetail(generics.RetrieveAPIView):
 
         debit_card = DebitCard.objects.filter(card_number=number, account__user=user).first()
 
-
         if not debit_card:
+            security_logger.warning("debit_card.not_found actor_id=%s", user.pk)
             raise exceptions.NotFound()
 
+        logger.info(
+            "debit_card.viewed actor_id=%s card_id=%s account_id=%s",
+            user.pk,
+            debit_card.pk,
+            debit_card.account_id,
+        )
         return debit_card
 
 

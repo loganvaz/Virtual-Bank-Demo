@@ -46,7 +46,7 @@ def log_created(event, user, transaction, **fields):
         "%s.created actor_id=%s transaction_id=%s payer_id=%s payee_id=%s amount_sent=%s currency_sent=%s amount_received=%s currency_received=%s %s",
         event,
         getattr(user, "pk", None),
-        transaction.identifier,
+        transaction.identifier.hex,
         transaction.payer_id,
         transaction.payee_id,
         transaction.amount_sent,
