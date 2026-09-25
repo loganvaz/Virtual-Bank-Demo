@@ -2,6 +2,9 @@ from rest_framework import serializers
 from .models import DebitCard
 from .utils import generate_valid_credit_card_number, generate_cvv
 from accounts.serializers import AccountSerializer
+from virtual_bank.log_redaction import get_redacted_logger, mask_number
+
+logger = get_redacted_logger(__name__)
 
 
 class DebitCardSerializer(serializers.ModelSerializer):
@@ -21,6 +24,10 @@ class DebitCardSerializer(serializers.ModelSerializer):
             validated_data["card_number"], validated_data["expiration_date"]
         )
         credit_card = DebitCard.objects.create(**validated_data)
+        logger.info(
+            "Debit card issued card_id=%s account_id=%s card=%s",
+            credit_card.id, credit_card.account_id, mask_number(credit_card.card_number),
+        )
         return credit_card
 
     def get_expiration_date(self, obj):
