@@ -9,7 +9,8 @@ import xml.etree.ElementTree as ET
 
 DOMAINS = {
     "TXN  transaction processing": ["transactions/views.py", "transactions/utils.py", "transactions/models.py"],
-    "VALID data validation": ["transactions/serializers.py", "transactions/paginations.py"],
+    "ACCT  account lifecycle": ["accounts/views.py", "accounts/models.py", "accounts/utils.py"],
+    "VALID data validation": ["transactions/serializers.py", "transactions/paginations.py", "accounts/serializers.py"],
     "AUDIT audit logging": ["virtual_bank/logging/request_id.py", "virtual_bank/logging/__init__.py"],
     "PII   PII handling": ["virtual_bank/logging/pii.py"],
 }

@@ -3,7 +3,6 @@ branch = True
 # Scoped to the demo's control-domain modules (transactions + logging layer).
 source = .
 omit =
-    accounts/*
     api/*
     debit_cards/*
     notifications/*
