@@ -298,5 +298,7 @@ LOGGING = {
     "loggers": {
         "django": {"level": "WARNING", "propagate": True},
         "transactions": {"level": "INFO", "propagate": True},
+        "users": {"level": "INFO", "propagate": True},
+        "security": {"level": "INFO", "propagate": True},
     },
 }
