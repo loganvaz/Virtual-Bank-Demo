@@ -274,10 +274,19 @@ LOGGING = {
         },
     },
     "loggers": {
-        "transactions": {
+        app: {
             "handlers": ["console"],
             "level": os.getenv("LOG_LEVEL", "INFO"),
             "propagate": False,
-        },
+        }
+        for app in (
+            "users",
+            "accounts",
+            "debit_cards",
+            "notifications",
+            "transactions",
+            "websocket",
+            "virtual_bank",
+        )
     },
 }
