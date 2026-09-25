@@ -1,13 +1,12 @@
 [run]
 branch = True
-# Scoped to the demo's control-domain modules (transactions + logging layer).
+# Scoped to the demo's control-domain modules (transactions + users + logging layer).
 source = .
 omit =
     accounts/*
     api/*
     debit_cards/*
     notifications/*
-    users/*
     websocket/*
     virtual_bank/*.py
     conftest.py
