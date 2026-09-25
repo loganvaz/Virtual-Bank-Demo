@@ -97,7 +97,8 @@ docker compose exec api ./run_tests_with_reports.sh <app>
 ```
 
 "Before" failures report = new suite against the **original** source (shows which tests
-catch the bugs):
+catch the bugs). **Commit your changes first** — the restore step below is `checkout HEAD`,
+so uncommitted edits to those files would be lost:
 
 ```bash
 git checkout main -- api/<app>/views.py api/<app>/serializers.py api/<app>/utils.py
