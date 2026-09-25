@@ -2,11 +2,11 @@ from decimal import Decimal
 
 def convert_currency(amount, source_currency, target_currency):
     exchange_rates = {
-        'USD': Decimal(1.00),
-        'EUR': Decimal(0.85),
-        'GBP': Decimal(0.75),
-        'NGN': Decimal(750.00),
-        'JPY': Decimal(110.50)
+        'USD': Decimal("1.00"),
+        'EUR': Decimal("0.85"),
+        'GBP': Decimal("0.75"),
+        'NGN': Decimal("750.00"),
+        'JPY': Decimal("110.50")
     }
 
     if source_currency not in exchange_rates or target_currency not in exchange_rates:

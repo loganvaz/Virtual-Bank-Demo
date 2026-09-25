@@ -1,3 +1,4 @@
+from decimal import Decimal
 from rest_framework import serializers
 from .models import Transaction
 from accounts.serializers import AccountSerializer
@@ -16,8 +17,8 @@ class DepositSerializer(serializers.ModelSerializer):
     date = serializers.DateTimeField(read_only=True)
     account = AccountSerializer(read_only=True)
     amount_received = serializers.DecimalField(max_digits=15, decimal_places=2, read_only=True)
-    account_number = serializers.CharField(write_only=True)
-    amount = serializers.IntegerField(write_only=True)
+    account_number = serializers.RegexField(r"^\d+$", write_only=True)
+    amount = serializers.DecimalField(max_digits=15, decimal_places=2, min_value=Decimal("0.01"), write_only=True)
     transaction_type = serializers.ChoiceField(choices=Transaction.TRANSACTION_TYPES, read_only=True, default="DEPOSIT")
 
     class Meta:
@@ -45,9 +46,9 @@ class TransferSerializer(serializers.ModelSerializer):
     account = AccountSerializer(read_only=True)
     payer = AccountSerializer(read_only=True)
     payee = AccountSerializer(read_only=True)
-    payer_account_number = serializers.CharField(write_only=True)
-    payee_account_number = serializers.CharField(write_only=True)
-    amount = serializers.IntegerField(write_only=True)
+    payer_account_number = serializers.RegexField(r"^\d+$", write_only=True)
+    payee_account_number = serializers.RegexField(r"^\d+$", write_only=True)
+    amount = serializers.DecimalField(max_digits=15, decimal_places=2, min_value=Decimal("0.01"), write_only=True)
     amount_sent = serializers.DecimalField(max_digits=15, decimal_places=2, read_only=True)
     amount_received = serializers.DecimalField(max_digits=15, decimal_places=2, read_only=True)
     currency_sent = serializers.CharField(read_only=True)
@@ -84,9 +85,9 @@ class DebitCardTransactionSerializer(serializers.ModelSerializer):
     account = AccountSerializer(read_only=True)
     payer = AccountSerializer(read_only=True)
     payee = AccountSerializer(read_only=True)
-    amount = serializers.IntegerField(write_only=True)
+    amount = serializers.DecimalField(max_digits=15, decimal_places=2, min_value=Decimal("0.01"), write_only=True)
     amount_sent = serializers.DecimalField(max_digits=15, decimal_places=2, read_only=True)
-    payee_account_number = serializers.CharField(write_only=True)
+    payee_account_number = serializers.RegexField(r"^\d+$", write_only=True)
     card_number = serializers.CharField(write_only=True)
     cvv = serializers.CharField(max_length=4, write_only=True)
     expiration_date = serializers.CharField(write_only=True)

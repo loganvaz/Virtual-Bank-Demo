@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from datetime import timedelta
+from virtual_bank.logging import build_logging_config
 
 # Load environment variables from .env
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -220,6 +221,13 @@ CSRF_TRUSTED_ORIGINS = [
     API_URL,
     CLIENT_URL,
 ]
+
+LOGGING = build_logging_config(level=os.getenv("LOG_LEVEL", "INFO"))
+
+if os.getenv("TEST_REPORT_DIR"):
+    TEST_RUNNER = "xmlrunner.extra.djangotestrunner.XMLTestRunner"
+    TEST_OUTPUT_DIR = os.getenv("TEST_REPORT_DIR")
+    TEST_OUTPUT_FILE_NAME = "junit.xml"
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(days=2),
