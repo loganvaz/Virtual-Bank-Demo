@@ -1,5 +1,8 @@
 from .models import Notification
 from users.models import User
+from virtual_bank.log_redaction import get_redacted_logger
+
+logger = get_redacted_logger(__name__)
 
 def process_notifications(user, type, message):
     """
@@ -15,6 +18,11 @@ def process_notifications(user, type, message):
     """
     # Check if the notification type is valid
     if type not in ['user_notification', 'account_notification', 'transaction_notification', 'security_notification']:
+        logger.warning(
+            "notification rejected: reason=unknown_type type=%s target=%s",
+            type,
+            'admin' if user == 'admin' else user.pk,
+        )
         raise Exception('Unknown notification type')
 
     # Determine users to notify based on the input 'user'
@@ -22,6 +30,12 @@ def process_notifications(user, type, message):
 
     # Iterate through users to notify and send appropriate notifications
     for target_user in users_to_notify:
+        logger.info(
+            "notification dispatched: user_id=%s type=%s admin_broadcast=%s",
+            target_user.pk,
+            type,
+            user == 'admin',
+        )
         if type == 'user_notification':
             send_user_notification(target_user, message)
         elif type == 'account_notification':
