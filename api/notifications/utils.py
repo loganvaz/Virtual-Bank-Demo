@@ -1,5 +1,16 @@
 from .models import Notification
 from users.models import User
+from virtual_bank.logging import get_logger
+
+logger = get_logger("notifications")
+
+NOTIFICATION_TYPES = (
+    "user_notification",
+    "account_notification",
+    "transaction_notification",
+    "security_notification",
+)
+
 
 def process_notifications(user, type, message):
     """
@@ -11,11 +22,19 @@ def process_notifications(user, type, message):
     - message (str): The content of the notification.
 
     Raises:
-    - Exception: If an unknown notification type is encountered.
+    - ValueError: If an unknown notification type is encountered.
     """
     # Check if the notification type is valid
-    if type not in ['user_notification', 'account_notification', 'transaction_notification', 'security_notification']:
-        raise Exception('Unknown notification type')
+    if type not in NOTIFICATION_TYPES:
+        logger.warning(
+            "notification rejected: unknown_type",
+            extra={
+                "event": "notification.rejected",
+                "reason": "unknown_type",
+                "user_id": None if user == 'admin' else user.pk,
+            },
+        )
+        raise ValueError('Unknown notification type')
 
     # Determine users to notify based on the input 'user'
     users_to_notify = User.objects.filter(is_superuser=True) if user == 'admin' else [user]
@@ -32,14 +51,28 @@ def process_notifications(user, type, message):
             send_security_notification(target_user, message)
 
 
+def _create(user, notification_type, message):
+    notification = Notification.objects.create(user=user, notification_type=notification_type, content=message)
+    logger.info(
+        "notification created",
+        extra={
+            "event": "notification.created",
+            "user_id": user.pk,
+            "notification_id": notification.pk,
+            "notification_type": notification_type,
+        },
+    )
+    return notification
+
+
 def send_user_notification(user, message):
-    Notification.objects.create(user=user, notification_type='USER_NOTIFICATION', content=message)
+    return _create(user, 'USER_NOTIFICATION', message)
 
 def send_account_notification(user, message):
-    Notification.objects.create(user=user, notification_type='ACCOUNT_NOTIFICATION', content=message)
+    return _create(user, 'ACCOUNT_NOTIFICATION', message)
 
 def send_transaction_notification(user, message):
-    Notification.objects.create(user=user, notification_type='TRANSACTION_NOTIFICATION', content=message)
+    return _create(user, 'TRANSACTION_NOTIFICATION', message)
 
 def send_security_notification(user, message):
-    Notification.objects.create(user=user, notification_type='SECURITY_NOTIFICATION', content=message)
+    return _create(user, 'SECURITY_NOTIFICATION', message)
