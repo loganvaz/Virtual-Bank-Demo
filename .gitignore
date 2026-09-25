@@ -175,3 +175,4 @@ api/reports/coverage_html/
 api/reports/junit.xml
 api/reports/pytest_report.html
 __pycache__/
+api/reports/
