@@ -53,7 +53,7 @@ def generate_cvv(card_number, expiration_date):
 
     cvv = []
     index = 0
-    for char in hashed[::-5]:
+    for char in hashed[::-5] + hashed[::-1]:
         index += 1
         try:
             int_value = int(char)

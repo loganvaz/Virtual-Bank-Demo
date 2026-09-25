@@ -40,9 +40,13 @@ class GenerateCvvTests(SimpleTestCase):
 
     def test_three_digits_and_deterministic(self):
         cvv = generate_cvv("5000000000000009", self.exp)
-        self.assertEqual(len(cvv), 3)
-        self.assertTrue(cvv.isdigit())
         self.assertEqual(cvv, generate_cvv("5000000000000009", self.exp))
+        for i in range(200):
+            number = generate_valid_credit_card_number()
+            with self.subTest(number=number):
+                cvv = generate_cvv(number, self.exp + timedelta(days=i))
+                self.assertEqual(len(cvv), 3)
+                self.assertTrue(cvv.isdigit())
 
     def test_changes_with_inputs(self):
         base = generate_cvv("5000000000000009", self.exp)
