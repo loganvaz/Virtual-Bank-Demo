@@ -257,3 +257,36 @@ SIMPLE_JWT = {
 
 
 LOGIN_URL = 'api:user_login'
+
+# Logging. Transaction logs must never contain PII: only user ids and masked
+# account numbers are logged (see transactions/logging_utils.py and
+# scripts/scan_logs_for_pii.py).
+LOG_DIR = os.path.join(BASE_DIR, "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "standard": {
+            "format": "%(asctime)s %(levelname)s %(name)s %(message)s",
+        },
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "standard"},
+        "transactions_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": os.path.join(LOG_DIR, "transactions.log"),
+            "maxBytes": 5 * 1024 * 1024,
+            "backupCount": 3,
+            "formatter": "standard",
+        },
+    },
+    "loggers": {
+        "transactions": {
+            "handlers": ["console", "transactions_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+}

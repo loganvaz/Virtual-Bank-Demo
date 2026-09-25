@@ -24,6 +24,7 @@ from .utils import convert_currency
 from accounts.utils import currency_to_unicode
 
 from .paginations import TransactionPagination
+from .logging_utils import log_transaction, mask_account
 
 class DateError(Exception):
     pass
@@ -53,11 +54,14 @@ class CreateDepositTransaction(generics.CreateAPIView):
         account = Account.objects.filter(number=account_number).first()
 
         if not account:
+            log_transaction("deposit_rejected", self.request.user, reason="account_not_found", account=mask_account(account_number))
             raise exceptions.NotFound("Account not found")
 
         if account.user != self.request.user:
+            log_transaction("deposit_rejected", self.request.user, reason="not_owner", account=mask_account(account_number))
             raise exceptions.PermissionDenied("Account does not belong to this user")
 
+        log_transaction("deposit_ok", self.request.user, account=mask_account(account_number), amount=transaction_amount, currency=account.currency)
         serializer.save(account=account, payer=account, payee=account, amount_sent=transaction_amount, amount_received=transaction_amount, transaction_type="DEPOSIT", currency_sent=account.currency, currency_received=account.currency, rate=1)
 
         # Update Account Balance
@@ -86,6 +90,7 @@ class CreateTransferTransaction(generics.CreateAPIView):
         user_name = f"{user.first_name} {user.last_name}"
 
         if int(payer_account_number) == int(payee_account_number):
+            log_transaction("transfer_rejected", user, reason="same_account", payer=mask_account(payer_account_number))
             # notification
             notification_message = "The transfer could not be completed."
             process_notifications(
@@ -97,9 +102,11 @@ class CreateTransferTransaction(generics.CreateAPIView):
             )
 
         if not account:
+            log_transaction("transfer_rejected", user, reason="payer_not_found", payer=mask_account(payer_account_number))
             raise exceptions.NotFound("Account not found")
 
         if account.user != user:
+            log_transaction("transfer_rejected", user, reason="not_owner", payer=mask_account(payer_account_number))
             # notification
             notification_message = f"{user_name} attempted a transfer using your account ({account.number}). For security purposes, the action has been flagged."
             process_notifications(
@@ -110,6 +117,7 @@ class CreateTransferTransaction(generics.CreateAPIView):
         payee_account = Account.objects.filter(number=payee_account_number).first()
 
         if not payee_account:
+            log_transaction("transfer_rejected", user, reason="payee_not_found", payee=mask_account(payee_account_number))
             # notification
             notification_message = (
                 "The transfer could not be completed due to an invalid account number."
@@ -120,6 +128,7 @@ class CreateTransferTransaction(generics.CreateAPIView):
             raise exceptions.NotFound("Payee Account not found")
 
         if account.balance >= transaction_amount:
+            log_transaction("transfer_ok", user, payer=mask_account(payer_account_number), payee=mask_account(payee_account_number), amount=transaction_amount, currency=account.currency)
             payee_account_name = payee_account.user.get_full_name()
             currency = convert_currency(
                 transaction_amount, account.currency, payee_account.currency
@@ -165,6 +174,7 @@ class CreateTransferTransaction(generics.CreateAPIView):
                 )
 
         else:
+            log_transaction("transfer_rejected", user, reason="insufficient_funds", payer=mask_account(payer_account_number), amount=transaction_amount)
             # notification
             notification_message = (
                 "The transfer could not be completed due to insufficient funds."

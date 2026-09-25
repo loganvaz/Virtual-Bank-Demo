@@ -17,7 +17,7 @@ class DepositSerializer(serializers.ModelSerializer):
     account = AccountSerializer(read_only=True)
     amount_received = serializers.DecimalField(max_digits=15, decimal_places=2, read_only=True)
     account_number = serializers.CharField(write_only=True)
-    amount = serializers.IntegerField(write_only=True)
+    amount = serializers.IntegerField(write_only=True, min_value=1)
     transaction_type = serializers.ChoiceField(choices=Transaction.TRANSACTION_TYPES, read_only=True, default="DEPOSIT")
 
     class Meta:
@@ -47,7 +47,7 @@ class TransferSerializer(serializers.ModelSerializer):
     payee = AccountSerializer(read_only=True)
     payer_account_number = serializers.CharField(write_only=True)
     payee_account_number = serializers.CharField(write_only=True)
-    amount = serializers.IntegerField(write_only=True)
+    amount = serializers.IntegerField(write_only=True, min_value=1)
     amount_sent = serializers.DecimalField(max_digits=15, decimal_places=2, read_only=True)
     amount_received = serializers.DecimalField(max_digits=15, decimal_places=2, read_only=True)
     currency_sent = serializers.CharField(read_only=True)
@@ -84,7 +84,7 @@ class DebitCardTransactionSerializer(serializers.ModelSerializer):
     account = AccountSerializer(read_only=True)
     payer = AccountSerializer(read_only=True)
     payee = AccountSerializer(read_only=True)
-    amount = serializers.IntegerField(write_only=True)
+    amount = serializers.IntegerField(write_only=True, min_value=1)
     amount_sent = serializers.DecimalField(max_digits=15, decimal_places=2, read_only=True)
     payee_account_number = serializers.CharField(write_only=True)
     card_number = serializers.CharField(write_only=True)
