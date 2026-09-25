@@ -16,6 +16,8 @@ STRUCTURED_FIELDS = (
     "payee_account_id",
     "txn_id",
     "txn_type",
+    "notification_id",
+    "notification_type",
     "amount",
     "currency",
     "currency_sent",
@@ -130,6 +132,7 @@ def build_logging_config(level="INFO"):
         "root": {"handlers": ["console"], "level": "WARNING"},
         "loggers": {
             "transactions": {"handlers": ["console"], "level": level, "propagate": False},
+            "notifications": {"handlers": ["console"], "level": level, "propagate": False},
             "security": {"handlers": ["console"], "level": "WARNING", "propagate": False},
             "django.request": {"handlers": ["console"], "level": "WARNING", "propagate": False},
         },
