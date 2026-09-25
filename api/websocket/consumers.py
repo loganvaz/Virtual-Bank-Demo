@@ -1,11 +1,14 @@
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 import json
+import logging
+
+logger = logging.getLogger("virtual_bank.security")
 
 class Consumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.user = self.scope['user']
-        print(self.user)
+        logger.debug("websocket.connect user_id=%s", getattr(self.user, "id", None))
         
         if self.user.is_authenticated:
             self.group_name = f"user_{self.user.id}"
@@ -29,7 +32,7 @@ class Consumer(AsyncWebsocketConsumer):
 
     async def receive(self, text_data):
         data = json.loads(text_data)
-        print(data)
+        logger.debug("websocket.receive keys=%s", sorted(data))
 
     async def send_transaction(self, event):
         data = event['data']

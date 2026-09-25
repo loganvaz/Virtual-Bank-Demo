@@ -193,6 +193,32 @@ STATIC_URL = "/static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "filters": {
+        "redact_pii": {"()": "virtual_bank.logging_utils.PIIRedactionFilter"},
+    },
+    "formatters": {
+        "audit": {"format": "%(asctime)s %(levelname)s %(name)s %(message)s"},
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "filters": ["redact_pii"],
+            "formatter": "audit",
+        },
+    },
+    "root": {"handlers": ["console"], "level": "INFO"},
+    "loggers": {
+        "virtual_bank.auth": {"level": "INFO", "propagate": True},
+        "virtual_bank.security": {"level": "INFO", "propagate": True},
+    },
+}
+
+AUTH_COOKIE_SECURE = not DEBUG
+AUTH_COOKIE_SAMESITE = "Lax"
+
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 

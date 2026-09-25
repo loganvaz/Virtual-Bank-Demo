@@ -5,10 +5,13 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError
 from notifications.utils import process_notifications
 from .utils import get_client_ip
-import datetime
-import os
+from django.conf import settings
+import logging
+
+logger = logging.getLogger("virtual_bank.auth")
 
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
@@ -52,6 +55,9 @@ class UserUpdate(generics.UpdateAPIView):
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_object(self):
+        return self.request.user
+
     def update(self, request, *args, **kwargs):
         user = self.request.user
 
@@ -94,16 +100,35 @@ class UserCreate(generics.CreateAPIView):
         process_notifications("admin", "user_notification", notification_message)
 
 
+def set_auth_cookies(response, access_token, refresh_token):
+    flags = {
+        "httponly": True,
+        "secure": settings.AUTH_COOKIE_SECURE,
+        "samesite": settings.AUTH_COOKIE_SAMESITE,
+    }
+    response.set_cookie("vb_token", access_token, **flags)
+    response.set_cookie("vb_rtoken", refresh_token, **flags)
+
+
 class Login(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
-        response = super().post(request, *args, **kwargs)
-        
+        ip = get_client_ip(request)
+        try:
+            response = super().post(request, *args, **kwargs)
+        except AuthenticationFailed:
+            logger.warning("auth.login.failed ip=%s", ip)
+            raise
+
         access_token = response.data.get("access")
         refresh_token = response.data.get("refresh")
-        
+
         if access_token:
-            response.set_cookie("vb_token", access_token, httponly=True)
-            response.set_cookie("vb_rtoken", refresh_token, httponly=True)
+            set_auth_cookies(response, access_token, refresh_token)
+            logger.info(
+                "auth.login.success user_id=%s ip=%s",
+                RefreshToken(refresh_token)["user_id"],
+                ip,
+            )
 
         return response
 
@@ -115,8 +140,7 @@ class RefreshTokenView(TokenRefreshView):
         refresh_token = response.data.get("refresh")
 
         if access_token:
-            response.set_cookie("vb_token", access_token, httponly=True)
-            response.set_cookie("vb_rtoken", refresh_token, httponly=True)
+            set_auth_cookies(response, access_token, refresh_token)
 
         return response
 
@@ -125,16 +149,17 @@ class Logout(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
+        refresh_token = request.COOKIES.get("vb_rtoken")
         try:
-            refresh_token = request.COOKIES.get("vb_rtoken")
-            token = RefreshToken(refresh_token)
-            token.blacklist()
-            
-            response = Response({"details": "success"})
-            
-            response.delete_cookie('vb_token')
-            response.delete_cookie('vb_rtoken')
-            
-            return response
-        except Exception as e:
-            return Response({"details": "failed"})
+            if not refresh_token:
+                raise TokenError("missing refresh token")
+            RefreshToken(refresh_token).blacklist()
+        except TokenError:
+            logger.warning("auth.logout.failed user_id=%s", request.user.id)
+            return Response({"details": "failed"}, status=status.HTTP_400_BAD_REQUEST)
+
+        logger.info("auth.logout.success user_id=%s", request.user.id)
+        response = Response({"details": "success"})
+        response.delete_cookie("vb_token")
+        response.delete_cookie("vb_rtoken")
+        return response

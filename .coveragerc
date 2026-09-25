@@ -1,0 +1,18 @@
+[run]
+source = .
+parallel = true
+concurrency = multiprocessing
+omit =
+    */migrations/*
+    */tests/*
+    */tests.py
+    manage.py
+    */asgi.py
+    */wsgi.py
+
+[report]
+show_missing = true
+skip_empty = true
+
+[html]
+title = Virtual Bank API coverage

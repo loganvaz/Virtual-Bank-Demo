@@ -5,7 +5,7 @@ class JWTAuthenticationMiddleware:
     def __call__(self, request):
         token = request.COOKIES.get('vb_token')
         
-        if token:
+        if token and 'HTTP_AUTHORIZATION' not in request.META:
             request.META['HTTP_AUTHORIZATION'] = f'Bearer {token}'
         response = self.get_response(request)
         return response
